@@ -5,7 +5,7 @@ Safely lists and deletes Git feature branches that follow the naming convention:
     feature/*
 
 Only branches where **all commits are already merged into the `main` branch**
-are selected for deletion.
+and meet additional safety rules are selected for deletion.
 
 ---
 
@@ -27,6 +27,7 @@ are selected for deletion.
   - Local feature branches (if present)
   - Remote feature branches (`origin`)
 - Uses Git ancestry checks to ensure branches are fully merged
+- Skips protected and recently updated branches
 - Summary report at the end
 - Safe to re-run multiple times
 
@@ -36,13 +37,39 @@ are selected for deletion.
 
 A `feature/*` branch is considered safe to delete only if:
 
-    git merge-base --is-ancestor feature-branch main
+    git merge-base --is-ancestor origin/feature-branch origin/main
 
 This guarantees **every commit in the feature branch already exists in `main`**.
 
 No commit counting.  
 No heuristics.  
 Git-level correctness.
+
+---
+
+## Protection Rules
+
+The script will **never delete** the following branches:
+
+    feature/release-*
+    feature/hotfix-*
+
+These are treated as protected branches and are always skipped.
+
+---
+
+## Recent Activity Safeguard
+
+Branches updated within the last **N days** are skipped to avoid deleting
+recent or active work.
+
+Default behavior:
+
+    Skip branches updated in the last 14 days
+
+This value can be adjusted directly in the script:
+
+    SKIP_DAYS=14
 
 ---
 
@@ -54,7 +81,7 @@ Git-level correctness.
 - Base branch: `main`
 - Feature branch naming format: `feature/*`
 
-⚠️ Linux is not supported by default due to `date` and shell differences.
+⚠️ Linux is not supported by default due to shell and tooling differences.
 
 ---
 
@@ -96,11 +123,13 @@ No changes are made.
 
 Example output:
 
-    Feature branches fully merged into 'main':
-      - feature/login-refactor
-      - feature/header-cleanup
+    Feature branches eligible for cleanup:
+      - feature/MAR-296-blog-page-refresh
+      - feature/MAR-409-Ai-summary-on-blogs
 
-    Total candidates: 2
+    Total candidates     : 2
+    Skipped (protected)  : 4
+    Skipped (recent)     : 6
 
     Dry run completed. No changes were made.
 
@@ -124,15 +153,16 @@ After execution, the script prints:
 
     Cleanup summary:
       Deleted branches : 3
-      Skipped branches : 0
-      Total processed  : 3
+      Failed deletions : 0
+      Skipped recent   : 6
+      Skipped protected: 4
 
 ---
 
 ## Recommended Workflow
 
     cleanup-feature-branches.sh
-    # review output
+    # review output carefully
 
     cleanup-feature-branches.sh --force
     # type "yes" to confirm
@@ -142,7 +172,8 @@ After execution, the script prints:
 ## Safety Guarantees
 
 - Never deletes unmerged feature branches
-- Uses Git ancestry checks (`merge-base`)
+- Never deletes protected branches
+- Skips recently updated branches
 - No deletion without `--force`
 - No deletion without explicit confirmation
 - Local branches deleted only if they exist
